@@ -129,7 +129,7 @@ export const Stations: Station[] = [
     name: "QUEENSTOWN MRT STATION",
     id: "EW19",
     lat: 1.2948609327949876,
-    long: 104.8058843,
+    long: 103.8058843,
   },
   {
     name: "TUAS LINK MRT STATION",
@@ -369,7 +369,7 @@ export const Stations: Station[] = [
     name: "PETIR LRT STATION",
     id: "BP7",
     lat: 1.3777503338172215,
-    long: 104.766669,
+    long: 103.766669,
   },
   {
     name: "TECK WHYE LRT STATION",
