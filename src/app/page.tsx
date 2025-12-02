@@ -1,19 +1,61 @@
 "use client";
+
 import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 import { Station, Stations } from "./MRT Stations";
-import { useEffect } from "react";
-function findClosestStation(coordinates: { lat: number; long: number }) {
+
+type Coordinates = { lat: number; long: number };
+
+const mapBounds = Stations.reduce(
+  (bounds, station) => {
+    return {
+      minLat: Math.min(bounds.minLat, station.lat),
+      maxLat: Math.max(bounds.maxLat, station.lat),
+      minLong: Math.min(bounds.minLong, station.long),
+      maxLong: Math.max(bounds.maxLong, station.long),
+    };
+  },
+  {
+    minLat: Number.POSITIVE_INFINITY,
+    maxLat: Number.NEGATIVE_INFINITY,
+    minLong: Number.POSITIVE_INFINITY,
+    maxLong: Number.NEGATIVE_INFINITY,
+  }
+);
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function normalizeToMap({ lat, long }: Coordinates) {
+  const latRange = mapBounds.maxLat - mapBounds.minLat;
+  const longRange = mapBounds.maxLong - mapBounds.minLong;
+
+  if (latRange === 0 || longRange === 0) {
+    return { x: 50, y: 50 };
+  }
+
+  const xPercent = ((long - mapBounds.minLong) / longRange) * 100;
+  const yPercent = ((mapBounds.maxLat - lat) / latRange) * 100;
+
+  return {
+    x: clamp(xPercent, 0, 100),
+    y: clamp(yPercent, 0, 100),
+  };
+}
+
+function findClosestStation(coordinates: Coordinates) {
   const closest: { distance: number; station: Station | null } = {
-    distance: 9999999999999999999,
+    distance: Number.POSITIVE_INFINITY,
     station: null,
   };
+
   Stations.forEach((station) => {
-    // Uses havasine formula to get distance
-    const R = 6371; // Radius of the Earth in miles
-    const rlat1 = coordinates.lat * (Math.PI / 180); // Convert degrees to radians
-    const rlat2 = station.lat * (Math.PI / 180); // Convert degrees to radians
-    const difflat = rlat2 - rlat1; // Radian difference (latitudes)
-    const difflon = (station.long - coordinates.long) * (Math.PI / 180); // Radian difference (longitudes)
+    const R = 6371; // Radius of the Earth in kilometers
+    const rlat1 = coordinates.lat * (Math.PI / 180);
+    const rlat2 = station.lat * (Math.PI / 180);
+    const difflat = rlat2 - rlat1;
+    const difflon = (station.long - coordinates.long) * (Math.PI / 180);
 
     const distance =
       2 *
@@ -27,127 +69,147 @@ function findClosestStation(coordinates: { lat: number; long: number }) {
               Math.sin(difflon / 2)
         )
       );
+
     if (distance < closest.distance) {
       closest.distance = distance;
       closest.station = station;
     }
   });
-  return closest;
+
+  return closest.station;
 }
+
 export default function Home() {
+  const [position, setPosition] = useState<Coordinates | null>(null);
+  const [closestStation, setClosestStation] = useState<Station | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        const lat = position.coords.latitude;
-        const long = position.coords.longitude;
-        const station = findClosestStation({ lat: lat, long: long });
-        console.log({ lat, long });
-        console.log(station);
-        window.alert(`${station.station?.name} (${station.station?.id})`);
-      });
-    } else {
-      console.log("No Geolocation");
-      /* geolocation IS NOT available */
+    if (!("geolocation" in navigator)) {
+      setError("Geolocation is not available in this browser.");
+      return;
     }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (coords) => {
+        const lat = coords.coords.latitude;
+        const long = coords.coords.longitude;
+        const location = { lat, long };
+
+        setPosition(location);
+        setClosestStation(findClosestStation(location));
+        setError(null);
+      },
+      (geoError) => {
+        setError(geoError.message);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 10_000,
+        timeout: 10_000,
+      }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const markerPosition = useMemo(() => {
+    if (!position) return null;
+    return normalizeToMap(position);
+  }, [position]);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+  const closestStationMarker = useMemo(() => {
+    if (!closestStation) return null;
+    return normalizeToMap({ lat: closestStation.lat, long: closestStation.long });
+  }, [closestStation]);
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10">
+        <header className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold">MRT Tracker</h1>
+          <p className="text-base text-neutral-600 dark:text-neutral-300">
+            Live view of your location relative to the Singapore MRT &amp; LRT map.
+          </p>
+        </header>
+
+        <section className="grid gap-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950">
             <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+              src="/Singapore_MRT_and_LRT_System_Map.svg"
+              alt="Singapore MRT and LRT system map"
+              fill
+              priority
+              className="object-contain"
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+            <div className="pointer-events-none absolute inset-0">
+              {markerPosition && (
+                <div
+                  className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500 shadow-[0_0_0_6px_rgba(16,185,129,0.25)]"
+                  style={{
+                    left: `${markerPosition.x}%`,
+                    top: `${markerPosition.y}%`,
+                    width: "16px",
+                    height: "16px",
+                  }}
+                  aria-label="Your location"
+                />
+              )}
+
+              {closestStationMarker && (
+                <div
+                  className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-indigo-500 bg-white shadow-[0_0_0_4px_rgba(99,102,241,0.2)] dark:bg-neutral-900"
+                  style={{
+                    left: `${closestStationMarker.x}%`,
+                    top: `${closestStationMarker.y}%`,
+                    width: "16px",
+                    height: "16px",
+                  }}
+                  aria-label="Closest station"
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-3 w-3 rounded-full bg-emerald-500" />
+              <span>Your location</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-3 w-3 rounded-full border-2 border-indigo-500 bg-white dark:bg-neutral-900" />
+              <span>Closest MRT station</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <h2 className="text-lg font-semibold">Location details</h2>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <div className="grid gap-2 text-sm text-neutral-700 dark:text-neutral-200">
+            <p className="font-medium">Status</p>
+            <p>
+              {position
+                ? "Tracking your live position."
+                : "Waiting for location permissions or GPS lock..."}
+            </p>
+
+            {position && (
+              <p>
+                Current coordinates: {position.lat.toFixed(5)}, {position.long.toFixed(5)}
+              </p>
+            )}
+
+            {closestStation && (
+              <p>
+                Closest station: {closestStation.name} ({closestStation.id})
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

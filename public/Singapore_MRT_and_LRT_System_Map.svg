@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100" width="1600" height="1100" role="img" aria-labelledby="title desc">
+  <title>Singapore MRT and LRT system map placeholder</title>
+  <desc>A lightweight placeholder map. Replace this file with the official Singapore_MRT_and_LRT_System_Map.svg to see the real map.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="0" y1="0" y2="1">
+      <stop stop-color="#f8fafc" offset="0" />
+      <stop stop-color="#e2e8f0" offset="1" />
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="1100" fill="url(#bg)" />
+  <g fill="none" stroke="#cbd5e1" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M200 180 C 350 210 420 260 520 280 S 760 330 880 310 1110 260 1340 280" />
+    <path d="M260 340 C 420 380 520 420 660 430 S 930 440 1130 410 1340 380 1420 420" />
+    <path d="M220 520 C 380 520 520 540 640 560 S 960 610 1220 600 1420 530 1460 520" />
+    <path d="M260 700 C 430 710 610 720 760 730 910 740 1110 760 1260 780 1380 800 1420 840" />
+    <path d="M220 880 C 420 880 640 880 840 880 1040 880 1260 880 1400 860" />
+  </g>
+  <g fill="#0f172a" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif">
+    <text x="800" y="120" text-anchor="middle" font-size="48" font-weight="700">Singapore MRT &amp; LRT System Map</text>
+    <text x="800" y="170" text-anchor="middle" font-size="20" fill="#475569">Placeholder artwork — drop the official SVG into /public to replace</text>
+  </g>
+  <g font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="18" fill="#0f172a">
+    <text x="190" y="180">North South line</text>
+    <text x="220" y="340">East West line</text>
+    <text x="190" y="520">Downtown line</text>
+    <text x="220" y="700">Thomson-East Coast line</text>
+    <text x="190" y="880">Circle line</text>
+  </g>
+  <g fill="#2563eb" stroke="#0f172a" stroke-width="2">
+    <circle cx="320" cy="240" r="12" />
+    <circle cx="540" cy="300" r="12" />
+    <circle cx="760" cy="320" r="12" />
+    <circle cx="980" cy="300" r="12" />
+    <circle cx="1220" cy="300" r="12" />
+  </g>
+</svg>
